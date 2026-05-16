@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSM FileHub — Open File Storage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --surface2: #f0eeea;
+    --border: #e2dfd8;
+    --text: #1a1916;
+    --text2: #6b6760;
+    --accent: #2d6a4f;
+    --accent-light: #e8f5ee;
+    --accent2: #b7e4c7;
+    --danger: #c0392b;
+    --danger-light: #fdf0ef;
+    --warn: #d68910;
+    --warn-light: #fef9ec;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo {
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: -0.3px;
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .nav-logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .nav-actions { display: flex; gap: 8px; align-items: center; }
+  .nav-user { font-size: 13px; color: var(--text2); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 16px; border-radius: 7px; font-family: inherit;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    border: 1px solid transparent; transition: all .15s ease;
+    text-decoration: none; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #245a41; }
+  .btn-ghost { background: transparent; color: var(--text2); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .btn-danger:hover { background: #a93226; }
+  .btn-sm { padding: 4px 10px; font-size: 13px; border-radius: 6px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ── PAGES ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── AUTH PAGE ── */
+  .auth-wrap {
+    min-height: calc(100vh - 56px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 16px;
+  }
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 40px;
+    width: 100%; max-width: 420px;
+    box-shadow: var(--shadow-lg);
+  }
+  .auth-card h2 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .auth-card p { color: var(--text2); font-size: 14px; margin-bottom: 28px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text2); }
+  .form-group input {
+    width: 100%; padding: 10px 13px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-family: inherit; font-size: 14px;
+    background: var(--bg); color: var(--text);
+    outline: none; transition: border .15s;
+  }
+  .form-group input:focus { border-color: var(--accent); background: #fff; }
+  .form-group input::placeholder { color: #b0aea8; }
+  .auth-switch { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text2); }
+  .auth-switch a { color: var(--accent); cursor: pointer; font-weight: 500; }
+
+  /* ── SETUP PAGE (GitHub token) ── */
+  .setup-card { max-width: 560px; }
+  .info-box {
+    background: var(--accent-light);
+    border: 1px solid var(--accent2);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #1e4d36;
+    margin-bottom: 20px;
+    line-height: 1.7;
+  }
+  .info-box code {
+    font-family: 'DM Mono', monospace;
+    background: #d4edda;
+    padding: 1px 5px; border-radius: 4px; font-size: 12px;
+  }
+  .step-list { list-style: none; counter-reset: steps; }
+  .step-list li { counter-increment: steps; display: flex; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+  .step-list li::before {
+    content: counter(steps);
+    background: var(--accent); color: #fff;
+    border-radius: 50%; width: 20px; height: 20px; min-width: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; margin-top: 1px;
+  }
+
+  /* ── DASHBOARD ── */
+  .dashboard-wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+  .dashboard-header { margin-bottom: 28px; }
+  .dashboard-header h1 { font-size: 22px; font-weight: 600; }
+  .dashboard-header p { color: var(--text2); font-size: 14px; margin-top: 2px; }
+
+  /* Storage bar */
+  .storage-bar-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
+  .storage-bar-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .storage-bar-top span { font-size: 13px; color: var(--text2); }
+  .storage-bar-top strong { font-size: 13px; }
+  .storage-track { height: 8px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+  .storage-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s ease; }
+  .storage-fill.warn { background: var(--warn); }
+  .storage-fill.danger { background: var(--danger); }
+
+  /* Upload zone */
+  .upload-zone {
+    background: var(--surface); border: 2px dashed var(--border);
+    border-radius: var(--radius); padding: 36px 24px;
+    text-align: center; cursor: pointer; transition: all .2s;
+    margin-bottom: 20px; position: relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent); background: var(--accent-light);
+  }
+  .upload-zone input[type=file] { display: none; }
+  .upload-icon { font-size: 36px; margin-bottom: 10px; }
+  .upload-zone h3 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  .upload-zone p { color: var(--text2); font-size: 13px; }
+  .upload-zone .folder-btn { margin-top: 12px; }
+
+  /* Progress */
+  .progress-wrap { margin-bottom: 20px; display: none; }
+  .progress-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;
+  }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .progress-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%; }
+  .progress-pct { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; }
+  .prog-track { height: 5px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+  .prog-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .2s; }
+
+  /* File list */
+  .files-section h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; font-size: 12px; }
+  .file-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    margin-bottom: 8px; display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 12px; align-items: center;
+  }
+  .file-icon { font-size: 20px; }
+  .file-info {}
+  .file-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+  .file-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .file-path {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--accent);
+    background: var(--accent-light);
+    border: 1px solid var(--accent2);
+    border-radius: 5px; padding: 3px 8px;
+    margin-top: 5px; word-break: break-all;
+    cursor: pointer; display: inline-block;
+    transition: opacity .15s;
+  }
+  .file-path:hover { opacity: .7; }
+  .file-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* Toast */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--text); color: #fff;
+    padding: 11px 18px; border-radius: 8px;
+    font-size: 13px; max-width: 320px;
+    animation: toastIn .2s ease;
+    box-shadow: var(--shadow-lg);
+  }
+  .toast.success { background: var(--accent); }
+  .toast.error { background: var(--danger); }
+  .toast.warn { background: var(--warn); color: #fff; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Alert */
+  .alert { border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .alert.error { background: var(--danger-light); border: 1px solid #f1948a; color: var(--danger); }
+  .alert.warn { background: var(--warn-light); border: 1px solid #f0b429; color: #7d4e0f; }
+
+  /* Empty */
+  .empty { text-align: center; padding: 48px 20px; color: var(--text2); }
+  .empty .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty h3 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  .empty p { font-size: 13px; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 500; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 14px; padding: 32px; max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); }
+  .modal h3 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .modal p { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Loader */
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    nav { padding: 0 16px; }
+    .auth-card { padding: 28px 20px; }
+    .dashboard-wrap { padding: 20px 12px; }
+    .file-card { grid-template-columns: 24px 1fr; }
+    .file-actions { grid-column: 1/-1; }
+    .file-name { max-width: 200px; }
+  }
+
+  /* Tab switcher for setup */
+  .tabs { display: flex; gap: 2px; background: var(--surface2); border-radius: 8px; padding: 3px; margin-bottom: 20px; }
+  .tab { flex: 1; padding: 8px; text-align: center; font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; color: var(--text2); transition: all .15s; }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-dot"></div>
+    OSM FileHub
+  </a>
+  <div class="nav-actions">
+    <span class="nav-user" id="nav-username"></span>
+    <button class="btn btn-ghost btn-sm" id="btn-settings" style="display:none" onclick="showPage('setup')">⚙ Settings</button>
+    <button class="btn btn-ghost btn-sm" id="btn-logout" style="display:none" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<!-- TOAST -->
+<div id="toast-container"></div>
+
+<!-- PAGE: AUTH -->
+<div class="page active" id="page-auth">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="tabs">
+        <div class="tab active" id="tab-signin" onclick="switchTab('signin')">Sign in</div>
+        <div class="tab" id="tab-signup" onclick="switchTab('signup')">Sign up</div>
+      </div>
+
+      <div id="form-signin">
+        <h2>Welcome back</h2>
+        <p>Sign in to your OSM FileHub account</p>
+        <div class="alert error" id="signin-error"></div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="si-username" placeholder="your_username" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="si-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary" style="width:100%; margin-top:4px; justify-content:center" onclick="signIn()">Sign in</button>
+      </div>
+
+      <div id="form-signup" style="display:none">
+        <h2>Create account</h2>
+        <p>Start uploading and sharing OSM files</p>
+        <div class="alert error" id="signup-error"></div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="su-username" placeholder="your_username" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="su-password" placeholder="Min. 6 characters" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="su-confirm" placeholder="Repeat password" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" style="width:100%; margin-top:4px; justify-content:center" onclick="signUp()">Create account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: SETUP (GitHub token) -->
+<div class="page" id="page-setup">
+  <div class="auth-wrap">
+    <div class="auth-card setup-card">
+      <h2>⚙ GitHub Setup</h2>
+      <p style="margin-bottom:20px">Connect your GitHub account to store and serve files via raw.githubusercontent.com — the backbone of OSM-compatible hosting.</p>
+
+      <div class="info-box">
+        <strong>Why GitHub?</strong> Files stored in public GitHub repos are accessible via a permanent, CDN-like URL:
+        <br><code>https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}</code>
+        <br>This URL is fully compatible with OpenStreetMap tile/data servers.
+      </div>
+
+      <p style="color:var(--text2); font-size:13px; margin-bottom:12px;"><strong>Steps to get your token:</strong></p>
+      <ol class="step-list">
+        <li>Go to <strong>github.com → Settings → Developer settings → Personal access tokens → Tokens (classic)</strong></li>
+        <li>Click <strong>Generate new token (classic)</strong></li>
+        <li>Set expiration to <strong>No expiration</strong> (or any period)</li>
+        <li>Check <strong>repo</strong> scope (full control of private repositories)</li>
+        <li>Click <strong>Generate token</strong> and copy it</li>
+      </ol>
+
+      <div class="alert error" id="setup-error"></div>
+
+      <div class="form-group" style="margin-top:16px">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      </div>
+      <div class="form-group">
+        <label>GitHub Username</label>
+        <input type="text" id="gh-username" placeholder="your_github_username">
+      </div>
+      <div class="form-group">
+        <label>Repository Name <span style="color:var(--text2); font-weight:400">(will be created if it doesn't exist)</span></label>
+        <input type="text" id="gh-repo" placeholder="osm-filehub-storage">
+      </div>
+      <div class="form-group">
+        <label>Branch</label>
+        <input type="text" id="gh-branch" value="main" placeholder="main">
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveSetup()" id="btn-save-setup">Verify & Save</button>
+        <button class="btn btn-ghost" onclick="showPage('dashboard')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: DASHBOARD -->
+<div class="page" id="page-dashboard">
+  <div class="dashboard-wrap">
+    <div class="dashboard-header">
+      <h1>Your Files</h1>
+      <p>Upload files — get instant OSM-compatible download paths</p>
+    </div>
+
+    <!-- Storage bar -->
+    <div class="storage-bar-wrap">
+      <div class="storage-bar-top">
+        <span>Storage used</span>
+        <strong id="storage-text">0 MB / 500 MB</strong>
+      </div>
+      <div class="storage-track">
+        <div class="storage-fill" id="storage-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Upload zone -->
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">📁</div>
+      <h3>Drop files here, or click to browse</h3>
+      <p>Any file type supported · Max 500 MB total per account</p>
+      <button class="btn btn-ghost btn-sm folder-btn" onclick="event.stopPropagation(); document.getElementById('folder-input').click()">📂 Upload Folder</button>
+      <input type="file" id="file-input" multiple onchange="handleFiles(this.files)">
+      <input type="file" id="folder-input" multiple webkitdirectory onchange="handleFiles(this.files)">
+    </div>
+
+    <!-- Upload progress -->
+    <div class="progress-wrap" id="progress-wrap"></div>
+
+    <!-- File list -->
+    <div class="files-section">
+      <h2>Uploaded Files</h2>
+      <div id="file-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <h3>Delete file?</h3>
+    <p>This will permanently delete the file from your GitHub repository. This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" id="btn-confirm-delete" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONSTANTS & STATE
+// ═══════════════════════════════════════════
+const MAX_BYTES = 500 * 1024 * 1024; // 500 MB
+let currentUser = null;
+let deleteTarget = null;
+
+// ═══════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  return (b / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function fileIcon(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const map = {
+    pdf: '📄', png: '🖼️', jpg: '🖼️', jpeg: '🖼️', gif: '🖼️', svg: '🖼️', webp: '🖼️',
+    mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬',
+    mp3: '🎵', wav: '🎵', ogg: '🎵',
+    zip: '📦', gz: '📦', tar: '📦', rar: '📦',
+    json: '📋', geojson: '🗺️', osm: '🗺️', pbf: '🗺️', mbtiles: '🗺️',
+    csv: '📊', xlsx: '📊', xls: '📊',
+    js: '💻', py: '💻', sh: '💻', html: '💻', css: '💻',
+    md: '📝', txt: '📝',
+  };
+  return map[ext] || '📁';
+}
+
+function toast(msg, type = 'default') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function showAlert(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function clearAlert(id) {
+  const el = document.getElementById(id);
+  el.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════
+//  AUTH (localStorage)
+// ═══════════════════════════════════════════
+function getUsers() {
+  return JSON.parse(localStorage.getItem('osm_users') || '{}');
+}
+
+function saveUsers(u) {
+  localStorage.setItem('osm_users', JSON.stringify(u));
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-signin').classList.toggle('active', tab === 'signin');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+  document.getElementById('form-signin').style.display = tab === 'signin' ? 'block' : 'none';
+  document.getElementById('form-signup').style.display = tab === 'signup' ? 'block' : 'none';
+  clearAlert('signin-error');
+  clearAlert('signup-error');
+}
+
+function signIn() {
+  clearAlert('signin-error');
+  const username = document.getElementById('si-username').value.trim();
+  const password = document.getElementById('si-password').value;
+  const users = getUsers();
+
+  if (!username || !password) return showAlert('signin-error', 'Please fill in all fields.');
+  if (!users[username]) return showAlert('signin-error', 'Account not found.');
+  if (users[username].password !== btoa(password)) return showAlert('signin-error', 'Incorrect password.');
+
+  currentUser = username;
+  localStorage.setItem('osm_session', username);
+  afterLogin();
+}
+
+function signUp() {
+  clearAlert('signup-error');
+  const username = document.getElementById('su-username').value.trim();
+  const password = document.getElementById('su-password').value;
+  const confirm = document.getElementById('su-confirm').value;
+  const users = getUsers();
+
+  if (!username || !password) return showAlert('signup-error', 'Please fill in all fields.');
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) return showAlert('signup-error', 'Username: 3-20 chars, letters/numbers/underscore only.');
+  if (password.length < 6) return showAlert('signup-error', 'Password must be at least 6 characters.');
+  if (password !== confirm) return showAlert('signup-error', 'Passwords do not match.');
+  if (users[username]) return showAlert('signup-error', 'Username already taken.');
+
+  users[username] = { password: btoa(password), files: [], usedBytes: 0, github: null };
+  saveUsers(users);
+  currentUser = username;
+  localStorage.setItem('osm_session', username);
+  afterLogin();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('osm_session');
+  document.getElementById('btn-logout').style.display = 'none';
+  document.getElementById('btn-settings').style.display = 'none';
+  document.getElementById('nav-username').textContent = '';
+  showPage('auth');
+}
+
+function afterLogin() {
+  document.getElementById('nav-username').textContent = currentUser;
+  document.getElementById('btn-logout').style.display = 'inline-flex';
+  document.getElementById('btn-settings').style.display = 'inline-flex';
+  const users = getUsers();
+  const ghOk = users[currentUser]?.github?.token;
+  showPage(ghOk ? 'dashboard' : 'setup');
+  if (ghOk) renderDashboard();
+}
+
+// ═══════════════════════════════════════════
+//  GITHUB SETUP
+// ═══════════════════════════════════════════
+async function saveSetup() {
+  clearAlert('setup-error');
+  const token = document.getElementById('gh-token').value.trim();
+  const ghUser = document.getElementById('gh-username').value.trim();
+  const repo = document.getElementById('gh-repo').value.trim();
+  const branch = document.getElementById('gh-branch').value.trim() || 'main';
+
+  if (!token || !ghUser || !repo) return showAlert('setup-error', 'All fields are required.');
+
+  const btn = document.getElementById('btn-save-setup');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Verifying...';
+
+  try {
+    // Verify token
+    const r = await fetch('https://api.github.com/user', {
+      headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github+json' }
+    });
+    if (!r.ok) { showAlert('setup-error', 'Invalid token. Please check and try again.'); return; }
+    const ghData = await r.json();
+    if (ghData.login.toLowerCase() !== ghUser.toLowerCase())
+      return showAlert('setup-error', `Token belongs to "${ghData.login}", not "${ghUser}".`);
+
+    // Ensure repo exists
+    const repoCheck = await fetch(`https://api.github.com/repos/${ghUser}/${repo}`, {
+      headers: { Authorization: 'token ' + token }
+    });
+    if (!repoCheck.ok) {
+      // Create repo
+      const create = await fetch('https://api.github.com/user/repos', {
+        method: 'POST',
+        headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: repo, description: 'OSM FileHub storage', private: false, auto_init: true })
+      });
+      if (!create.ok) {
+        const err = await create.json();
+        return showAlert('setup-error', 'Could not create repo: ' + (err.message || 'Unknown error'));
+      }
+      await new Promise(r => setTimeout(r, 1500)); // Let GitHub settle
+    }
+
+    // Save
+    const users = getUsers();
+    users[currentUser].github = { token, ghUser, repo, branch };
+    saveUsers(users);
+    toast('GitHub connected!', 'success');
+    showPage('dashboard');
+    renderDashboard();
+
+  } catch (e) {
+    showAlert('setup-error', 'Network error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify & Save';
+  }
+}
+
+function loadSetupForm() {
+  const users = getUsers();
+  const gh = users[currentUser]?.github;
+  if (gh) {
+    document.getElementById('gh-token').value = gh.token || '';
+    document.getElementById('gh-username').value = gh.ghUser || '';
+    document.getElementById('gh-repo').value = gh.repo || '';
+    document.getElementById('gh-branch').value = gh.branch || 'main';
+  }
+}
+
+// ═══════════════════════════════════════════
+//  PAGES
+// ═══════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (name === 'setup') loadSetupForm();
+}
+
+// ═══════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════
+function getUData() {
+  return getUsers()[currentUser] || {};
+}
+
+function saveUData(data) {
+  const users = getUsers();
+  users[currentUser] = { ...users[currentUser], ...data };
+  saveUsers(users);
+}
+
+function renderDashboard() {
+  const d = getUData();
+  const used = d.usedBytes || 0;
+  const pct = Math.min(100, (used / MAX_BYTES) * 100);
+  document.getElementById('storage-text').textContent = fmtBytes(used) + ' / 500 MB';
+  const fill = document.getElementById('storage-fill');
+  fill.style.width = pct + '%';
+  fill.className = 'storage-fill' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
+
+  renderFiles();
+}
+
+function renderFiles() {
+  const d = getUData();
+  const files = d.files || [];
+  const list = document.getElementById('file-list');
+
+  if (files.length === 0) {
+    list.innerHTML = `<div class="empty">
+      <div class="empty-icon">☁️</div>
+      <h3>No files yet</h3>
+      <p>Upload files above to get OSM-compatible download paths</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = files.slice().reverse().map((f, ri) => {
+    const i = files.length - 1 - ri;
+    return `<div class="file-card" id="fc-${i}">
+      <div class="file-icon">${fileIcon(f.name)}</div>
+      <div class="file-info">
+        <div class="file-name" title="${escHtml(f.name)}">${escHtml(f.name)}</div>
+        <div class="file-meta">${fmtBytes(f.size)} · ${new Date(f.uploadedAt).toLocaleDateString()}</div>
+        <div class="file-path" onclick="copyPath('${escHtml(f.rawUrl)}')" title="Click to copy">
+          🔗 ${escHtml(f.rawUrl)}
+        </div>
+      </div>
+      <div class="file-actions">
+        <a class="btn btn-ghost btn-sm" href="${escHtml(f.rawUrl)}" download="${escHtml(f.name)}" target="_blank">⬇ Download</a>
+        <button class="btn btn-ghost btn-sm" onclick="openDeleteModal(${i})">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function copyPath(url) {
+  navigator.clipboard.writeText(url).then(() => toast('Path copied!', 'success')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Path copied!', 'success');
+  });
+}
+
+// ═══════════════════════════════════════════
+//  UPLOAD
+// ═══════════════════════════════════════════
+// Drag & drop
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('dragover');
+  const items = e.dataTransfer.items;
+  if (items) {
+    const filePromises = [];
+    for (const item of items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+        if (entry && entry.isDirectory) {
+          filePromises.push(readDirectory(entry, entry.name));
+        } else {
+          const f = item.getAsFile();
+          if (f) filePromises.push(Promise.resolve([f]));
+        }
+      }
+    }
+    Promise.all(filePromises).then(arrays => {
+      const all = arrays.flat();
+      if (all.length) handleFiles(all);
+    });
+  } else {
+    handleFiles(e.dataTransfer.files);
+  }
+});
+
+function readDirectory(entry, basePath) {
+  return new Promise(resolve => {
+    const reader = entry.createReader();
+    const results = [];
+    function readAll() {
+      reader.readEntries(entries => {
+        if (!entries.length) { resolve(results); return; }
+        const promises = entries.map(e => {
+          if (e.isDirectory) return readDirectory(e, basePath + '/' + e.name);
+          return new Promise(res => e.file(f => {
+            Object.defineProperty(f, 'relativePath', { value: basePath + '/' + f.name });
+            res([f]);
+          }));
+        });
+        Promise.all(promises).then(arrs => { results.push(...arrs.flat()); readAll(); });
+      });
+    }
+    readAll();
+  });
+}
+
+async function handleFiles(filesRaw) {
+  const d = getUData();
+  const gh = d.github;
+  if (!gh || !gh.token) {
+    toast('Please configure GitHub first.', 'warn');
+    showPage('setup');
+    return;
+  }
+
+  const files = Array.from(filesRaw);
+  if (!files.length) return;
+
+  // Check size budget
+  const totalNew = files.reduce((s, f) => s + f.size, 0);
+  const usedNow = d.usedBytes || 0;
+  if (usedNow + totalNew > MAX_BYTES) {
+    toast(`Not enough space! Need ${fmtBytes(totalNew)}, have ${fmtBytes(MAX_BYTES - usedNow)} free.`, 'error');
+    return;
+  }
+
+  const progressWrap = document.getElementById('progress-wrap');
+  progressWrap.style.display = 'block';
+  progressWrap.innerHTML = '';
+
+  for (const file of files) {
+    await uploadFile(file, gh, progressWrap);
+  }
+
+  setTimeout(() => {
+    progressWrap.style.display = 'none';
+    progressWrap.innerHTML = '';
+  }, 1500);
+
+  renderDashboard();
+}
+
+async function uploadFile(file, gh, progressWrap) {
+  const name = file.name;
+  const relativePath = file.relativePath || null;
+
+  // Build path in repo
+  const repoPath = relativePath
+    ? `uploads/${relativePath.replace(/^\//, '')}`
+    : `uploads/${name}`;
+
+  // Progress UI
+  const pid = 'p' + Math.random().toString(36).slice(2);
+  progressWrap.insertAdjacentHTML('beforeend', `
+    <div class="progress-item" id="${pid}">
+      <div class="progress-header">
+        <div class="progress-name">${escHtml(name)}</div>
+        <div class="progress-pct" id="${pid}-pct">Reading…</div>
+      </div>
+      <div class="prog-track"><div class="prog-fill" id="${pid}-fill" style="width:0%"></div></div>
+    </div>`);
+
+  const pct = (v) => {
+    document.getElementById(`${pid}-pct`).textContent = v;
+    document.getElementById(`${pid}-fill`).style.width = typeof v === 'number' ? v + '%' : '100%';
+  };
+
+  try {
+    // Read file
+    pct('Reading…');
+    const base64 = await toBase64(file, p => pct(Math.round(p * 50) + '%'));
+
+    pct('50%');
+
+    // Check if file already exists (get SHA for update)
+    let sha = null;
+    try {
+      const check = await ghFetch(gh, `contents/${encodeURIComponent(repoPath).replace(/%2F/g, '/')}`);
+      if (check.ok) {
+        const existing = await check.json();
+        sha = existing.sha;
+      }
+    } catch (_) {}
+
+    pct('60%');
+
+    // Upload
+    const body = { message: `Upload ${name}`, content: base64, branch: gh.branch };
+    if (sha) body.sha = sha;
+
+    const resp = await ghFetch(gh, `contents/${encodeURIComponent(repoPath).replace(/%2F/g, '/')}`, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.message || 'Upload failed (' + resp.status + ')');
+    }
+
+    pct('95%');
+
+    const rawUrl = `https://raw.githubusercontent.com/${gh.ghUser}/${gh.repo}/${gh.branch}/${repoPath}`;
+
+    // Save metadata
+    const d = getUData();
+    const files = d.files || [];
+    // Remove duplicate if re-uploading same path
+    const idx = files.findIndex(f => f.repoPath === repoPath);
+    if (idx !== -1) { files.splice(idx, 1); }
+    files.push({ name, repoPath, rawUrl, size: file.size, uploadedAt: Date.now() });
+    let usedBytes = files.reduce((s, f) => s + (f.size || 0), 0);
+    saveUData({ files, usedBytes });
+
+    pct('100%');
+    toast(`${name} uploaded!`, 'success');
+
+  } catch (e) {
+    pct('Error');
+    document.getElementById(`${pid}-fill`).style.background = 'var(--danger)';
+    toast(`${name}: ${e.message}`, 'error');
+  }
+}
+
+function toBase64(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    reader.onload = () => {
+      const result = reader.result;
+      const b64 = result.split(',')[1];
+      resolve(b64);
+    };
+    reader.onerror = () => reject(new Error('File read error'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function ghFetch(gh, path, opts = {}) {
+  const url = `https://api.github.com/repos/${gh.ghUser}/${gh.repo}/${path}`;
+  return fetch(url, {
+    ...opts,
+    headers: {
+      Authorization: 'token ' + gh.token,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  DELETE
+// ═══════════════════════════════════════════
+function openDeleteModal(idx) {
+  deleteTarget = idx;
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+function closeModal() {
+  deleteTarget = null;
+  document.getElementById('delete-modal').classList.remove('open');
+}
+
+async function confirmDelete() {
+  if (deleteTarget === null) return;
+  const d = getUData();
+  const files = d.files || [];
+  const file = files[deleteTarget];
+  if (!file) return closeModal();
+
+  const gh = d.github;
+  const btn = document.getElementById('btn-confirm-delete');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    // Get SHA
+    const check = await ghFetch(gh, `contents/${encodeURIComponent(file.repoPath).replace(/%2F/g, '/')}`);
+    if (check.ok) {
+      const data = await check.json();
+      await ghFetch(gh, `contents/${encodeURIComponent(file.repoPath).replace(/%2F/g, '/')}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ message: `Delete ${file.name}`, sha: data.sha, branch: gh.branch })
+      });
+    }
+
+    files.splice(deleteTarget, 1);
+    const usedBytes = files.reduce((s, f) => s + (f.size || 0), 0);
+    saveUData({ files, usedBytes });
+    toast('File deleted.', 'default');
+    renderDashboard();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Delete';
+    closeModal();
+  }
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const session = localStorage.getItem('osm_session');
+  if (session) {
+    const users = getUsers();
+    if (users[session]) {
+      currentUser = session;
+      afterLogin();
+    }
+  }
+});
+</script>
+</body>
+</html>
